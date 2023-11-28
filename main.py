@@ -1,5 +1,5 @@
 from tkinter.simpledialog import askstring
-from tkinter.messagebox import showerror, showinfo
+from tkinter.messagebox import showerror, showinfo,askyesno
 from tkinter.ttk import Treeview, Style
 from tkinter import *
 from datetime import date
@@ -18,21 +18,30 @@ def clear_frame(frame_name):
 def add_page():
 
     def add_data():
-        global data_file
-        if website.get() != "" and username.get() != "" and password.get() != "":
-            data = pd.DataFrame({'website': [website.get()],
-                                 'username': [username.get()],
-                                 'password': [CRYPTO.encrypt(password.get().encode()).decode()],
-                                 'last update': [date.today().strftime("%d/%m/%Y")]})
-            data.index = [len(data_file)]
-            data_file = pd.concat([data_file, data], ignore_index=False)
-            data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
-            website.delete(0, END)
-            username.delete(0, END)
-            password.delete(0, END)
-            error_label.config(text="Successfully added", fg="green", padx=20)
-        else:
-            error_label.config(text="Values cant be empty", fg="red", padx=0)
+        website_data = website.get()
+        password_data = password.get()
+        username_data = username.get()
+
+        verified = askyesno('Verify info',f'Please verify this data\n'
+                                        f'website: {website_data}\n'
+                                        f'username: {username_data}\n'
+                                        f'password: {password_data}')
+        if verified:
+            global data_file
+            if website_data != "" and username_data != "" and password_data != "":
+                data = pd.DataFrame({'website': [website_data],
+                                     'username': [username_data],
+                                     'password': [CRYPTO.encrypt(password_data.encode()).decode()],
+                                     'last update': [date.today().strftime("%d/%m/%Y")]})
+                data.index = [len(data_file)]
+                data_file = pd.concat([data_file, data], ignore_index=False)
+                data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
+                website.delete(0, END)
+                username.delete(0, END)
+                password.delete(0, END)
+                error_label.config(text="Successfully added", fg="green", padx=20)
+            else:
+                error_label.config(text="Values cant be empty", fg="red", padx=0)
 
     def generate_password():
         password_generated = []
