@@ -34,9 +34,9 @@ def motion(event):
 def change_password():
     global PASSWORD
     while True:
-        old_pass = askstring('OLD','Type current password',show='*')
+        old_pass = askstring('OLD','Type current password',show='•')
         if old_pass == PASSWORD:
-            new_pass = askstring('NEW','Type new password')
+            new_pass = askstring('NEW','Type new password',show='•')
             PASSWORD = new_pass
             return True
         else:
@@ -47,7 +47,7 @@ def change_password():
 def admin_verify():
     global PASSWORD,data_file
     while True:
-        inserted_password = askstring('Admin verify', 'Enter admin password\ndecrypt will take 5 seconds')
+        inserted_password = askstring('Admin verify', 'Enter admin password\ndecrypt will take 5 seconds',show='•')
         new_file = open(f'{RESOURCE_PATH}/data_file.enc',mode='rb').read()
         if inserted_password is not None:
             try:
