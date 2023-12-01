@@ -1,18 +1,69 @@
+import tkinter
 from tkinter.simpledialog import askstring
 from tkinter.messagebox import showerror, showinfo,askyesno
 from tkinter.ttk import Treeview, Style
 from tkinter import *
 from datetime import date
 from cryptography.fernet import Fernet
+from io import StringIO
+
+import Cipher
 import pandas as pd
 import random
 import math
-import hashlib
+
+
+
+class Tk(Tk):
+    def destroy(self):
+        if data_file is not None:
+            csvString = data_file.to_csv(index=False)
+            with open(f'{RESOURCE_PATH}/data_file.enc',mode='wb') as save_file:
+                save_file.write(Cipher.encrypt(PASSWORD,csvString))
+        tkinter.Tk.destroy(self)
 
 
 def clear_frame(frame_name):
     for widgets in frame_name.winfo_children():
         widgets.destroy()
+
+def motion(event):
+    if event.char == 'a':
+        print(f"X: {event.x}, Y: {event.y}")
+
+def change_password():
+    global PASSWORD
+    while True:
+        old_pass = askstring('OLD','Type current password',show='*')
+        if old_pass == PASSWORD:
+            new_pass = askstring('NEW','Type new password')
+            PASSWORD = new_pass
+            return True
+        else:
+            showinfo('NOT MATCH','Current password inserted does not\nmatch current password')
+        if old_pass == None:
+            return False
+
+def admin_verify():
+    global PASSWORD,data_file
+    while True:
+        inserted_password = askstring('Admin verify', 'Enter admin password\ndecrypt will take 5 seconds')
+        new_file = open(f'{RESOURCE_PATH}/data_file.enc',mode='rb').read()
+        if inserted_password is not None:
+            try:
+                decrypted_file = Cipher.decrypt(inserted_password, new_file).decode()
+                csvFormat = StringIO(decrypted_file)
+                data_file = pd.read_csv(csvFormat)
+                PASSWORD = inserted_password
+                showinfo('Success', 'Admin successfully verified')
+
+                return True
+            except Cipher.DecryptionException:
+               showerror('Failure', 'Wrong password')
+        else:
+            window.destroy()
+            return False
+
 
 
 def add_page():
@@ -35,7 +86,7 @@ def add_page():
                                      'last update': [date.today().strftime("%d/%m/%Y")]})
                 data.index = [len(data_file)]
                 data_file = pd.concat([data_file, data], ignore_index=False)
-                data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
+                #data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
                 website.delete(0, END)
                 username.delete(0, END)
                 password.delete(0, END)
@@ -98,59 +149,40 @@ def add_page():
     window.mainloop()
 
 
-def motion(event):
-    if event.char == 'a':
-        print(f"X: {event.x}, Y: {event.y}")
-
-
-def admin_verify():
-    while True:
-        inserted_password = askstring('Admin verify', 'Enter admin password')
-        if inserted_password is not None:
-            hashed = hashlib.sha256(inserted_password.encode()).hexdigest()
-            if hashed == ADMIN_PASS:
-                showinfo('Success', 'Admin successfully verified')
-                return True
-            else:
-                showerror('Failure', 'Wrong password')
-        else:
-            return False
-
-
 def display_page():
-    if admin_verify():
-        def last_page(rows):
-            if rows[0] != 0:
-                rows[0] -= ROWS_PER_PAGE
-                rows[1] -= ROWS_PER_PAGE
-                data_table.delete(*data_table.get_children())
-                for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
-                    data = data[1]
-                    data_table.insert(parent='', index='end', iid=n,
-                                      values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
-                if len(data_file) != 0:
-                    indicator.config(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)}")
-
-        def next_page(rows):
-            if rows[1] < len(data_file):
-                rows[0] += ROWS_PER_PAGE
-                rows[1] += ROWS_PER_PAGE
-                data_table.delete(*data_table.get_children())
-                for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
-                    data = data[1]
-                    data_table.insert(parent='', index='end', iid=n,
-                                      values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
-                if len(data_file) != 0:
-                    indicator.config(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)}")
-
-        def update_table():
+    def last_page(rows):
+        if rows[0] != 0:
+            rows[0] -= ROWS_PER_PAGE
+            rows[1] -= ROWS_PER_PAGE
             data_table.delete(*data_table.get_children())
             for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
                 data = data[1]
                 data_table.insert(parent='', index='end', iid=n,
                                   values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
+            if len(data_file) != 0:
+                indicator.config(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)}")
 
-        def update_delete():
+    def next_page(rows):
+        if rows[1] < len(data_file):
+            rows[0] += ROWS_PER_PAGE
+            rows[1] += ROWS_PER_PAGE
+            data_table.delete(*data_table.get_children())
+            for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
+                data = data[1]
+                data_table.insert(parent='', index='end', iid=n,
+                                  values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
+            if len(data_file) != 0:
+                indicator.config(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)}")
+
+    def update_table():
+        data_table.delete(*data_table.get_children())
+        for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
+            data = data[1]
+            data_table.insert(parent='', index='end', iid=n,
+                              values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
+
+    def update_delete():
+        if data_table.focus() != '':
             global data_file
             data_file.index = [x for x in range(0, len(data_file))]
             if len(data_table.get_children()) != 0:
@@ -168,68 +200,107 @@ def display_page():
                     data_table.focus(data_table.get_children()[next_index])
                     data_table.selection_set(data_table.get_children()[next_index])
 
-                data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
+                #data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
 
                 if math.ceil(len(data_file) / ROWS_PER_PAGE) == len(data_file) / ROWS_PER_PAGE and len(data_file) != 0:
                     indicator.config(text=f"{round(rows[0] / ROWS_PER_PAGE) + 1} / {math.ceil(len(data_file) / ROWS_PER_PAGE)}")
 
-        clear_frame(window)
-
-        headline = Label(text="Password Manager", font=("Ariel", 20, "bold"), fg=MAIN_COLOR)
-        headline.place(x=200, y=10)
-
-        small_logo = Canvas(width=46, height=46, highlightthickness=0)
-        small_logo.create_image(23, 23, image=SMALL_LOGO)
-        small_logo.place(y=5, x=450)
-
-        trash_button = Button(image=TRASH_LOGO, borderwidth=0, fg=MAIN_COLOR, command=update_delete)
-        trash_button.place(x=650, y=7)
-
-        style = Style(window)
-        style.theme_use("clam")
-        style.configure("Treeview", background=MAIN_WHITE,
-                        fieldbackground=MAIN_WHITE, foreground="black")
-
-        data_table = Treeview(window, height=24)
-        data_table['columns'] = tuple(data_file.keys())
-        data_table.column("#0", width=0, stretch=NO)
-
-        rows = [0, ROWS_PER_PAGE]
-
-        if len(data_file) < 2:
-            rows[1] = len(data_file)
-
-        for col in data_table['columns']:
-            data_table.heading(col, text=col, anchor=CENTER)
-            if col != 'password':
-                data_table.column(col, width=0, anchor=CENTER)
+    def search():
+        searched_item = askstring('Search','Website name:')
+        if searched_item is not None:
+            if searched_item in data_file['website'].tolist():
+                data = data_file[data_file['website'] == searched_item].to_dict('list')
+                showinfo('Details',f'Website: {str(*data["website"])}\n'
+                                   f'Username: {str(*data["username"])}\n'
+                                   f'Password: {CRYPTO.decrypt(str(*data["password"]).encode()).decode()}\n')
             else:
-                data_table.column('password', width=50, anchor=CENTER)
+                showerror('Error','Website not found!')
 
-        for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
-            data = data[1]
-            data_table.insert(parent='', index='end', iid=n, values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
+    def edit_cell(event):
+        def destroy_popups():
+            for child in data_table.winfo_children():
+                if type(child) == Entry:
+                    child.destroy()
 
-        data_table.pack(fill="x", pady=50)
+        def save_data(event):
+            data_col = data_file.columns[int(cell_col[1])-1]
+            data_file[data_col][int(cell_row)] = edit_box.get()
+            #data_file.to_csv(path_or_buf=f"{RESOURCE_PATH}/passwordmanager.csv", mode="w", header=True, index=False)
+            update_table()
+            edit_box.destroy()
 
-        last_page_button = Button(borderwidth=0, text="last page", fg=MAIN_COLOR, bg=MAIN_WHITE, command=lambda: last_page(rows))
-        last_page_button.place(x=200, y=465)
+        destroy_popups()
+        cell_row = data_table.identify_row(event.y)
+        cell_col = data_table.identify_column(event.x)
+        if data_table.focus() != '' and cell_row != '':
+            x, y, width, height = data_table.bbox(cell_row,cell_col)
+            edit_box = Entry(data_table,width=int(width/7),justify=CENTER)
+            edit_box.insert(0,string=data_table.item(cell_row)['values'][int(cell_col[1])-1])
+            edit_box.place(x=x+(int(width/15)), y=y)
+            edit_box.focus()
+            edit_box.bind('<Return>',lambda event: save_data(event))
 
-        if len(data_file) == 0:
-            indicator = Label(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)+1}", fg=MAIN_COLOR)
+
+    clear_frame(window)
+
+    headline = Label(text="Password Manager", font=("Ariel", 20, "bold"), fg=MAIN_COLOR)
+    headline.place(x=200, y=10)
+
+    small_logo = Canvas(width=46, height=46, highlightthickness=0)
+    small_logo.create_image(23, 23, image=SMALL_LOGO)
+    small_logo.place(y=5, x=450)
+
+    search_button = Button(image=SEARCH_LOGO,borderwidth=0,command=search)
+    search_button.place(x=600,y=7)
+    trash_button = Button(image=TRASH_LOGO, borderwidth=0,highlightcolor=MAIN_COLOR, fg=MAIN_COLOR, command=update_delete)
+    trash_button.place(x=650, y=7)
+
+    style = Style(window)
+    style.theme_use("clam")
+    style.configure("Treeview", background=MAIN_WHITE,
+                    fieldbackground=MAIN_WHITE, foreground="black")
+
+    data_table = Treeview(window, height=24)
+    data_table['columns'] = tuple(data_file.keys())
+    data_table.column("#0", width=0, stretch=NO)
+    data_table.bind("<Double-1>",lambda event: edit_cell(event))
+
+    rows = [0, ROWS_PER_PAGE]
+
+    if len(data_file) < 2:
+        rows[1] = len(data_file)
+
+    for col in data_table['columns']:
+        data_table.heading(col, text=col, anchor=CENTER)
+        if col != 'password':
+            data_table.column(col, width=0, anchor=CENTER)
         else:
-            indicator = Label(
-                text=f"{round(rows[0] / ROWS_PER_PAGE) + 1} / {math.ceil(len(data_file) / ROWS_PER_PAGE)}",
-                fg=MAIN_COLOR)
-        indicator.place(x=340, y=467)
+            data_table.column('password', width=50, anchor=CENTER)
 
-        next_page_button = Button(borderwidth=0, text="next page", fg=MAIN_COLOR, bg=MAIN_WHITE, command=lambda: next_page(rows))
-        next_page_button.place(x=450, y=465)
+    for n, data in enumerate(data_file.iloc[rows[0]:rows[1]].iterrows()):
+        data = data[1]
+        data_table.insert(parent='', index='end', iid=n, values=(data['website'], data['username'], CRYPTO.decrypt(data['password'].encode()).decode(), data['last update']))
 
-        return_button = Button(image=RETURN_IMAGE, borderwidth=0, command=main_page)
-        return_button.place(x=10, y=5)
+    data_table.pack(fill="x", pady=50)
 
-        window.mainloop()
+    last_page_button = Button(borderwidth=0, text="last page", fg=MAIN_COLOR, bg=MAIN_WHITE, command=lambda: last_page(rows))
+    last_page_button.place(x=200, y=465)
+
+    if len(data_file) == 0:
+        indicator = Label(text=f"{round(rows[0]/ROWS_PER_PAGE)+1} / {math.ceil(len(data_file)/ROWS_PER_PAGE)+1}", fg=MAIN_COLOR)
+    else:
+        indicator = Label(
+            text=f"{round(rows[0] / ROWS_PER_PAGE) + 1} / {math.ceil(len(data_file) / ROWS_PER_PAGE)}",
+            fg=MAIN_COLOR)
+    indicator.place(x=340, y=467)
+
+    next_page_button = Button(borderwidth=0, text="next page", fg=MAIN_COLOR, bg=MAIN_WHITE, command=lambda: next_page(rows))
+    next_page_button.place(x=450, y=465)
+
+    return_button = Button(image=RETURN_IMAGE, borderwidth=0, command=main_page)
+    return_button.place(x=10, y=5)
+
+    window.mainloop()
 
 
 def main_page():
@@ -243,9 +314,16 @@ def main_page():
                             activeforeground=MAIN_COLOR, borderwidth=0, command=display_page)
     display_button.pack()
 
-    return_button = Button(text="Add", bg=MAIN_COLOR, fg=MAIN_WHITE, activebackground=MAIN_WHITE,
+    add_button = Button(text="Add", bg=MAIN_COLOR, fg=MAIN_WHITE, activebackground=MAIN_WHITE,
                            activeforeground=MAIN_COLOR, borderwidth=0, command=add_page)
-    return_button.pack(pady=60)
+    add_button.pack(pady=60)
+
+    change_password_button = Button(text='Change Password',bg=MAIN_COLOR,fg=MAIN_WHITE,activebackground=MAIN_WHITE,
+                                    activeforeground=MAIN_COLOR,borderwidth=0,command=change_password)
+    change_password_button.pack()
+
+    if PASSWORD == None:
+        admin_verify()
 
     window.mainloop()
 
@@ -257,14 +335,14 @@ window.geometry("700x500")
 RESOURCE_PATH = "resources/PasswordManager"
 LOGO_IMAGE = PhotoImage(file=f"{RESOURCE_PATH}/logo.png")
 SMALL_LOGO = PhotoImage(file=f"{RESOURCE_PATH}/small_logo.png")
-RETURN_IMAGE = PhotoImage(file=f"{RESOURCE_PATH}/return.png", width=40, height=40)
+RETURN_IMAGE = PhotoImage(file=f"{RESOURCE_PATH}/return.png")
 TRASH_LOGO = PhotoImage(file=f"{RESOURCE_PATH}/trash.png")
+SEARCH_LOGO = PhotoImage(file=f"{RESOURCE_PATH}/search.png")
 MAIN_COLOR = "#D4483B"
 MAIN_WHITE = "#F0F0F0"
 ROWS_PER_PAGE = 18
+PASSWORD = None
 CRYPTO = Fernet(b'YnhYyxH_YkYZvOYm9L04CJibItOd4BFEZLn1JCnRWWA=')
-ADMIN_PASS = '99bafb1d500f1078842fbf8aab8b6e45a91b141d74ad7fa9e545a5a819f173df'
-
-data_file = pd.read_csv(f"{RESOURCE_PATH}/passwordmanager.csv")
+data_file = None
 
 main_page()
